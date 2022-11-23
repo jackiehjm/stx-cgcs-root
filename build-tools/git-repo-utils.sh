@@ -117,6 +117,26 @@ git_repo_remote_url () {
     git config remote.$remote.url
 }
 
+url_to_host () {
+    local URL="${1}"
+
+    # Strip                protocol,          path,         user/pwd,        port
+    echo "${URL}" | sed -e 's#^[^:]*://##' -e 's#/.*$##' -e 's#^[^@]*@##' -e 's#:.*$##'
+}
+
+host_to_domain () {
+    local host="${1}"
+    local elements=0
+
+    elements=$(echo "${host}" | sed 's#[^.]##g' |  wc --chars)
+    if [ $elements -gt 2 ]; then
+        # strip lead element
+        echo "${host}" | sed 's#^[^.]*.##'
+    else
+        echo "${host}"
+    fi
+}
+
 git_repo_review_method () {
     local DIR="${1:-${PWD}}"
     local GIT_DIR=""
