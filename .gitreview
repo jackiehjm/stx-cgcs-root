@@ -1,4 +1,5 @@
 [gerrit]
-host=review.opendev.org
+host=ala-codereviewti-prod.wrs.com
 port=29418
-project=starlingx/root.git
+project=cgcs/opendev.org.starlingx.root
+defaultbranch=WRCP_22.12
