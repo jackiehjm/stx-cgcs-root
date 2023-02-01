@@ -327,6 +327,13 @@ class DebDownloader(BaseDownloader):
                         logger.error(str(e))
                         sys.exit(1)
                     arch = package.candidate.architecture
+                    if arch != "all" and arch != self.arch:
+                        arch = self.arch
+
+                if arch != "all":
+                    pkg_name = pkg_name_array[0] + ':' + arch
+
+
                 pname_arch = '_'.join([pkg_name, pkg_ver, arch]) + '.deb'
                 pname_epoch_arch = '_'.join([pkg_name, pkg_name_array[1], arch]) + '.deb'
                 self.dl_need.append(pkg_name + '_' + pkg_ver)
