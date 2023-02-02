@@ -48,7 +48,7 @@ PKGBUILDER_ROOT = "/localdisk/pkgbuilder"
 USER = os.environ.get('MYUNAME')
 PROJECT = os.environ.get('PROJECT')
 DISTRIBUTION = os.environ.get('DEBIAN_DISTRIBUTION')
-STX_ARCH = 'amd64'
+STX_ARCH = 'arm64'
 STX_META_NAME = 'stx-meta'
 STX_META_PKG = 'stx-meta_1.0.orig.tar.gz'
 # Different reasons can lead to package build failure
