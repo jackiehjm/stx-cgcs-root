@@ -28,7 +28,7 @@ import signal
 import sys
 import utils
 
-DEFAULT_ARCH = 'amd64'
+DEFAULT_ARCH = 'arm64'
 REPO_BIN = 'deb-local-binary'
 mirror_root = os.environ.get('STX_MIRROR')
 stx_src_mirror = os.path.join(mirror_root, 'sources')
