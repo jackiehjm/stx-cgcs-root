@@ -908,7 +908,7 @@ def subcmd_mirror(subparsers):
     mirror_parser.add_argument('--component', '-c', help='component name', required=False,
                                default='nginx')
     mirror_parser.add_argument('--architectures', '-a', help='architectures', required=False,
-                               default='amd64')
+                               default='arm64')
     mirror_parser.add_argument('--with-sources', '-s', help='include source packages',
                                action='store_true')
     mirror_parser.set_defaults(handle=_handleMirror)
