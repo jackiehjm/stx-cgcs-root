@@ -292,7 +292,6 @@ startpar
 strace
 strongswan
 sudo-ldap
-syslinux-utils
 syslog-ng
 sysstat
 sysvinit-utils
