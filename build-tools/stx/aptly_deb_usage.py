@@ -320,7 +320,7 @@ class Deb_aptly():
                     self.logger.warning('Drop failed publication %s : %s', publish_name, task_state)
                     return None
         task = self.aptly.publish.publish(source_kind='local', sources=[{'Name': repo_name}],
-                                          architectures=['arm64', 'source'], prefix=publish_name,
+                                          architectures=['amd64', 'arm64', 'source'], prefix=publish_name,
                                           distribution=None, sign_skip=True)
         task_state = self.__wait_for_task(task, 10)
         if task_state != 'SUCCEEDED':
@@ -361,7 +361,7 @@ class Deb_aptly():
             extra_param['origin'] = None
         else:
             # Only support binary_arm64 and source packages
-            extra_param['architectures'] = ['arm64', 'source']
+            extra_param['architectures'] = ['amd64', 'arm64', 'source']
             extra_param['distribution'] = None
             extra_param['origin'] = self.origin
 

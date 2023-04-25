@@ -327,6 +327,8 @@ class DebDownloader(BaseDownloader):
                         logger.error(str(e))
                         sys.exit(1)
                     arch = package.candidate.architecture
+                    # arch is from apt_cache
+                    # self.arch is the DEFAULT_ARCH
                     if arch != "all" and arch != self.arch:
                         arch = self.arch
 
