@@ -28,6 +28,7 @@ import sys
 import utils
 from utils import run_shell_cmd, get_download_url
 import yaml
+import platform
 
 
 RELEASENOTES = " ".join([os.environ.get('PROJECT'), os.environ.get('MY_RELEASE'), "distribution"])
@@ -35,7 +36,21 @@ DIST = os.environ.get('STX_DIST')
 CENGN_BASE = os.path.join(os.environ.get('CENGNURL'), "debian")
 CENGN_STRATEGY = os.environ.get('CENGN_STRATEGY')
 BTYPE = "@KERNEL_TYPE@"
+BARCH = "@BUILD_ARCH@"
 
+STX_ARCH = "amd64"
+host_arch = platform.machine()
+if host_arch == 'aarch64':
+    STX_ARCH = "arm64"
+
+DL_FILES_DEFAULT = "dl_files"
+DL_FILES_ARCH = DL_FILES_DEFAULT + "_" + STX_ARCH
+
+DL_PATH_DEFAULT = "dl_path"
+DL_PATH_ARCH = DL_PATH_DEFAULT + "_" + STX_ARCH
+
+SERIES_DEFAULT = "series"
+SERIES_ARCH = SERIES_DEFAULT + "_" + STX_ARCH
 
 class DownloadProgress():
     def __init__(self):
@@ -273,6 +288,16 @@ class Parser():
 
         self.pkginfo["debfolder"] = os.path.join(local_debian)
 
+    def set_build_arch(self):
+
+        local_debian = os.path.join(self.pkginfo["packdir"], "local_debian")
+
+        # clean @BUILD_ARCH@
+        sed_cmd = 'sed -i s#%s#%s#g %s'
+        for root, _, files in os.walk(local_debian):
+            for name in files:
+                run_shell_cmd(sed_cmd % (BARCH, STX_ARCH, os.path.join(root, name)), self.logger)
+
     def get_gitrevcount_srcdir(self, gitrevcount_obj):
         src_dir = str(gitrevcount_obj.get("SRC_DIR", ""))
         if src_dir:
@@ -440,8 +465,14 @@ class Parser():
         self.logger.info("Overwrite the debian folder by %s", metadata)
         run_shell_cmd('cp -r %s/* %s' % (metadata, deb_folder), self.logger)
 
-        series = os.path.join(metadata, "patches/series")
-        if not os.path.isfile(series):
+        series_default = os.path.join(metadata, "patches", SERIES_DEFAULT)
+        series_arch = os.path.join(metadata, "patches", SERIES_ARCH)
+
+        if os.path.isfile(series_arch):
+            series = series_arch
+        elif os.path.isfile(series_default):
+            series = series_default
+        else:
             return True
 
         format_ver, format_type = self.set_deb_format()
@@ -474,11 +505,16 @@ class Parser():
                 run_shell_cmd('cp -rL %s %s' % (src_file, self.pkginfo["srcdir"]),
                               self.logger)
 
-        if "dl_files" in self.meta_data:
+        dl_files = DL_FILES_DEFAULT
+        if DL_FILES_DEFAULT in self.meta_data:
+            # Arch specific dl_files have higher priority
+            if DL_FILES_ARCH in self.meta_data: 
+                dl_files = DL_FILES_ARCH
+
             pwd = os.getcwd()
             os.chdir(self.pkginfo["packdir"])
-            for dl_file in self.meta_data['dl_files']:
-                dir_name = self.meta_data['dl_files'][dl_file]['topdir']
+            for dl_file in self.meta_data[dl_files]:
+                dir_name = self.meta_data[dl_files][dl_file]['topdir']
                 dl_path = os.path.join(self.pkginfo["packdir"], dl_file)
                 if not os.path.exists(dl_path):
                     self.logger.error("No such file %s in local mirror", dl_file)
@@ -514,8 +550,15 @@ class Parser():
     def apply_src_patches(self):
 
         format_ver, format_type = self.set_deb_format()
-        series = os.path.join(self.pkginfo["debfolder"], "patches/series")
-        if not os.path.isfile(series):
+
+        series_default = os.path.join(self.pkginfo["debfolder"], "patches", SERIES_DEFAULT)
+        series_arch = os.path.join(self.pkginfo["debfolder"], "patches", SERIES_ARCH)
+
+        if os.path.isfile(series_arch):
+            series = series_arch
+        elif os.path.isfile(series_default):
+            series = series_default
+        else:
             return True
 
         f = open(series)
@@ -524,7 +567,13 @@ class Parser():
         f.close()
 
         patches_folder = os.path.join(self.pkginfo["srcdir"], "debian/patches")
-        series_file = os.path.join(self.pkginfo["srcdir"], "debian/patches/series")
+        series_file_default = os.path.join(patches_folder, SERIES_DEFAULT)
+        series_file_arch = os.path.join(patches_folder, SERIES_ARCH)
+
+        series_file = series_file_default
+        if os.path.isfile(series_file_arch):
+            series_file = series_file_arch
+
         if not os.path.isdir(patches_folder):
             os.mkdir(patches_folder)
             os.mknod(series_file)
@@ -564,9 +613,16 @@ class Parser():
 
     def apply_deb_patches(self):
 
-        series = os.path.join(self.pkginfo["debfolder"], "deb_patches/series")
-        if not os.path.isfile(series):
+        series_default = os.path.join(self.pkginfo["debfolder"], "deb_patches", SERIES_DEFAULT)
+        series_arch = os.path.join(self.pkginfo["debfolder"], "deb_patches", SERIES_ARCH)
+
+        if os.path.isfile(series_arch):
+            series = series_arch
+        elif os.path.isfile(series_default):
+            series = series_default
+        else:
             return True
+
         f = open(series)
         patches = f.readlines()
         patches_src = os.path.dirname(series)
@@ -586,8 +642,12 @@ class Parser():
         return True
 
     def extract_tarball(self):
+        # Arch specific dl_path have higher priority
+        dl_path = DL_PATH_DEFAULT
+        if DL_PATH_ARCH in self.meta_data: 
+            dl_path = DL_PATH_ARCH
 
-        tarball_name = self.meta_data["dl_path"]["name"]
+        tarball_name = self.meta_data[dl_path]["name"]
         tarball_file = os.path.join(self.pkginfo["packdir"], tarball_name)
 
         cmd, _, _ = tar_cmd(tarball_name, self.logger)
@@ -692,9 +752,14 @@ class Parser():
 
         pwd = os.getcwd()
         os.chdir(saveto)
-        if "dl_files" in self.meta_data:
-            for dl_file in self.meta_data['dl_files']:
-                dl_file_info = self.meta_data['dl_files'][dl_file]
+        dl_files = DL_FILES_DEFAULT
+        if DL_FILES_DEFAULT in self.meta_data:
+            # Arch specific dl_files have higher priority
+            if DL_FILES_ARCH in self.meta_data: 
+                dl_files = DL_FILES_ARCH
+
+            for dl_file in self.meta_data[dl_files]:
+                dl_file_info = self.meta_data[dl_files][dl_file]
                 url = dl_file_info['url']
                 if "sha256sum" in dl_file_info:
                     check_cmd = "sha256sum"
@@ -716,16 +781,21 @@ class Parser():
                     if not checksum(dl_file, check_sum, check_cmd, self.logger):
                         raise Exception(f'Fail to download {dl_file}')
 
-        if "dl_path" in self.meta_data:
-            dl_file = self.meta_data["dl_path"]["name"]
-            url = self.meta_data["dl_path"]["url"]
-            if "sha256sum" in self.meta_data["dl_path"]:
+        dl_path = DL_PATH_DEFAULT
+        if DL_PATH_DEFAULT in self.meta_data:
+            # Arch specific dl_path have higher priority
+            if DL_PATH_ARCH in self.meta_data: 
+                dl_path = DL_PATH_ARCH
+
+            dl_file = self.meta_data[dl_path]["name"]
+            url = self.meta_data[dl_path]["url"]
+            if "sha256sum" in self.meta_data[dl_path]:
                 check_cmd = "sha256sum"
-                check_sum = self.meta_data["dl_path"]['sha256sum']
+                check_sum = self.meta_data[dl_path]['sha256sum']
             else:
                 self.logger.warning(f"{dl_file} missing sha256sum")
                 check_cmd = "md5sum"
-                check_sum = self.meta_data["dl_path"]['md5sum']
+                check_sum = self.meta_data[dl_path]['md5sum']
             if not checksum(dl_file, check_sum, check_cmd, self.logger):
                 (dl_url, alt_dl_url) = get_download_url(url, self.strategy)
                 if alt_dl_url:
@@ -790,6 +860,7 @@ class Parser():
         os.mkdir(self.pkginfo["packdir"])
 
         self.set_build_type()
+        self.set_build_arch()
 
         logfile = os.path.join(self.pkginfo["packdir"], self.pkginfo["pkgname"] + ".log")
         if os.path.exists(logfile):
@@ -809,7 +880,7 @@ class Parser():
 
         if "dl_hook" in self.meta_data:
             self.run_dl_hook()
-        elif "dl_path" in self.meta_data:
+        elif DL_PATH_DEFAULT in self.meta_data:
             self.extract_tarball()
         elif "src_path" in self.meta_data:
             self.create_src_package()
