@@ -28,10 +28,16 @@ import sys
 import time
 import utils
 import yaml
+import platform
 
 STX_DEFAULT_DISTRO = discovery.STX_DEFAULT_DISTRO
 ALL_LAYERS = discovery.get_all_layers(distro=STX_DEFAULT_DISTRO)
 ALL_BUILD_TYPES = discovery.get_all_build_types(distro=STX_DEFAULT_DISTRO)
+
+STX_ARCH = 'amd64'
+host_arch = platform.machine()
+if host_arch == 'aarch64':
+    STX_ARCH = "arm64"
 
 LAT_ROOT = '/localdisk'
 REPO_ALL = 'deb-merge-all'
@@ -48,8 +54,8 @@ IMAGE_LAYERS_PATH = os.path.join(
 )
 img_pkgs = []
 kernel_type = 'std'
-stx_std_kernel = 'linux-image-5.10.0-6-amd64-unsigned'
-stx_rt_kernel =  'linux-rt-image-5.10.0-6-rt-amd64-unsigned'
+stx_std_kernel = 'linux-image-5.10.0-6-%s-unsigned' % STX_ARCH
+stx_rt_kernel =  'linux-rt-image-5.10.0-6-rt-%s-unsigned' % STX_ARCH
 WAIT_TIME_BEFORE_CHECKING_LOG = 2
 # The max timeout value to wait LAT to output the build log
 MAX_WAIT_LAT_TIME = 300
@@ -242,7 +248,7 @@ def update_rt_kernel_in_initramfs_yaml(initramfs_yaml):
 
     # Updated the name of kernel module
     for layer in ALL_LAYERS:
-        pkg_dirs = discovery.package_dir_list(distro=STX_DEFAULT_DISTRO, layer=layer, build_type='rt')
+        pkg_dirs = discovery.package_dir_list(distro=STX_DEFAULT_DISTRO, layer=layer, build_type='rt', arch=STX_ARCH)
         if not pkg_dirs:
             continue
         for pkg_dir in pkg_dirs:
@@ -305,7 +311,7 @@ def add_lat_packages(img_yaml, packages):
     yaml_doc['packages'].extend(packages)
 
     for build_type in ALL_BUILD_TYPES:
-        pkgs = discovery.package_iso_list(distro=STX_DEFAULT_DISTRO, layer="all", build_type=build_type)
+        pkgs = discovery.package_iso_list(distro=STX_DEFAULT_DISTRO, layer="all", build_type=build_type, arch=STX_ARCH)
         yaml_doc['packages'].extend(pkgs)
 
     yaml_doc['packages'] = list(set(yaml_doc['packages']))
@@ -319,8 +325,16 @@ def add_lat_packages(img_yaml, packages):
 
 
 def check_base_os_binaries(repomgr):
-    base_bins_list = os.path.join(os.environ.get('MY_REPO_ROOT_DIR'),
+    base_bins_list_default = os.path.join(os.environ.get('MY_REPO_ROOT_DIR'),
                                   'cgcs-root/build-tools/stx/debian-image.inc')
+    base_bins_list_arch = os.path.join(os.environ.get('MY_REPO_ROOT_DIR'),
+                                  'cgcs-root/build-tools/stx',
+                                  'debian-image_%s.inc' % STX_ARCH)
+    if os.path.exists(base_bins_list_arch):
+        base_bins_list = base_bins_list_arch
+    else:
+        base_bins_list = base_bins_list_default
+
     if not os.path.exists(base_bins_list):
         logger.error(' '.join(['Base OS packages list', base_bins_list,
                                'does not exist']))
@@ -338,8 +352,15 @@ def check_base_os_binaries(repomgr):
 
 
 def check_stx_binaries(repomgr, btype='std'):
-    stx_bins_list = ''.join([PKG_LIST_DIR, '/debian/distro/os-', btype,
-                             '.lst'])
+    stx_bins_list_default = ''.join([PKG_LIST_DIR, '/debian/distro/os-',
+                                     btype, '.lst'])
+    stx_bins_list_arch = ''.join([PKG_LIST_DIR, '/debian/distro/os-',
+                                  btype, '_', STX_ARCH, '.lst'])
+    if os.path.exists(stx_bins_list_arch):
+        stx_bins_list = stx_bins_list_arch
+    else:
+        stx_bins_list = stx_bins_list_default
+
     if not os.path.exists(stx_bins_list):
         logger.warning(' '.join(['STX binary packages list', stx_bins_list,
                                 'does not exist']))
@@ -660,16 +681,30 @@ if __name__ == "__main__":
         logger.error("Fail to get prepared to build image")
         sys.exit(1)
 
-    base_yaml = os.path.join(PKG_LIST_DIR, 'debian/common/base-bullseye.yaml')
-    base_initramfs_yaml = os.path.join(PKG_LIST_DIR, 'debian/common/base-initramfs-bullseye.yaml')
+    base_yaml_default = os.path.join(PKG_LIST_DIR, 'debian/common/base-bullseye.yaml')
+    base_yaml_arch = os.path.join(PKG_LIST_DIR, 'debian/common/base-bullseye_%s.yaml' % STX_ARCH)
+    base_initramfs_yaml_default = os.path.join(PKG_LIST_DIR, 'debian/common/base-initramfs-bullseye.yaml')
+    base_initramfs_yaml_arch = os.path.join(PKG_LIST_DIR, 'debian/common/base-initramfs-bullseye_%s.yaml' % STX_ARCH)
+
     os.environ["WORKSPACE_DIR"] = LAT_ROOT
     lat_yaml = os.path.join(LAT_ROOT, "lat.yaml")
     lat_initramfs_yaml = os.path.join(LAT_ROOT, "lat-initramfs.yaml")
 
-    for yaml_file in (base_yaml, base_initramfs_yaml):
-        if not os.path.exists(yaml_file):
-            logger.error(' '.join(['Base yaml file', yaml_file, 'does not exist']))
-            sys.exit(1)
+    if os.path.exists(base_yaml_arch):
+        base_yaml = base_yaml_arch
+    elif os.path.exists(base_yaml_default):
+        base_yaml = base_yaml_default
+    else:
+        logger.error(' '.join(['Base yaml file', base_yaml_default, 'does not exist']))
+        sys.exit(1)
+
+    if os.path.exists(base_initramfs_yaml_arch):
+        base_initramfs_yaml = base_initramfs_yaml_arch
+    elif os.path.exists(base_initramfs_yaml_default):
+        base_initramfs_yaml = base_initramfs_yaml_default
+    else:
+        logger.error(' '.join(['Base yaml file', base_initramfs_yaml_default, 'does not exist']))
+        sys.exit(1)
 
     if not os.path.exists(LAT_ROOT):
         os.makedirs(LAT_ROOT)
@@ -755,6 +790,10 @@ if __name__ == "__main__":
                     logger.info("Failed to build image, check the log %s", lat_log)
                     break
                 if "DEBUG: Deploy ovmf.qcow2" in line:
+                    logger.info("build-image successfully done, check the output in %s", LAT_ROOT)
+                    ret = 0
+                    break
+                if STX_ARCH == "arm64" and "INFO: Create ISO Image: Succeeded" in line:
                     logger.info("build-image successfully done, check the output in %s", LAT_ROOT)
                     ret = 0
                     break

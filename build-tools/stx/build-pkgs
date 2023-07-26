@@ -37,7 +37,7 @@ import tempfile
 import time
 import utils
 import yaml
-
+import platform
 
 BUILDER_URL = os.environ.get('BUILDER_URL')
 REPOMGR_URL = os.environ.get('REPOMGR_URL')
@@ -49,6 +49,10 @@ USER = os.environ.get('MYUNAME')
 PROJECT = os.environ.get('PROJECT')
 DISTRIBUTION = os.environ.get('DEBIAN_DISTRIBUTION')
 STX_ARCH = 'amd64'
+host_arch = platform.machine()
+if host_arch == 'aarch64':
+    STX_ARCH = "arm64"
+
 STX_META_NAME = 'stx-meta'
 STX_META_PKG = 'stx-meta_1.0.orig.tar.gz'
 # Different reasons can lead to package build failure
@@ -1655,7 +1659,7 @@ class BuildController():
             logger.error('Failed to specify build_type')
             return
 
-        pkg_dirs = discovery.package_dir_list(distro=self.attrs['distro'], layer=layer, build_type=build_type)
+        pkg_dirs = discovery.package_dir_list(distro=self.attrs['distro'], layer=layer, build_type=build_type, arch=STX_ARCH)
         layer_pkg_dirs = pkg_dirs
         word = "all"
         if packages:
