@@ -25,6 +25,7 @@ from debian import debian_support
 import os
 import time
 from typing import Optional
+import platform
 
 PREFIX_LOCAL = 'deb-local-'
 PREFIX_REMOTE = 'deb-remote-'
@@ -33,6 +34,11 @@ SIGN_KEY = 'E82373F817C276756FA64756FAAD0555200D6582'
 SIGN_PASSWD = 'starlingx'
 DEFAULT_TIMEOUT_COUNT = 1
 STX_DIST = os.environ.get('STX_DIST')
+
+STX_ARCH = 'amd64'
+host_arch = platform.machine()
+if host_arch == 'aarch64':
+    STX_ARCH = "arm64"
 
 # Class used to manage aptly data base, it can:
 #     create_remote: Create a repository link to a remote mirror
@@ -326,7 +332,7 @@ class Deb_aptly():
                     self.logger.warning('Drop failed publication %s : %s', publish_name, task_state)
                     return None
         task = self.aptly.publish.publish(source_kind='local', sources=[{'Name': repo_name}],
-                                          architectures=['amd64', 'source'], prefix=publish_name,
+                                          architectures=[STX_ARCH, 'source'], prefix=publish_name,
                                           distribution=None, sign_skip=True)
         task_state = self.__wait_for_task(task, 10)
         if task_state != 'SUCCEEDED':
@@ -366,8 +372,8 @@ class Deb_aptly():
             extra_param['distribution'] = mirror.distribution
             extra_param['origin'] = None
         else:
-            # Only support binary_amd64 and source packages
-            extra_param['architectures'] = ['amd64', 'source']
+            # Only support binary_amd64/arm64 and source packages
+            extra_param['architectures'] = [STX_ARCH, 'source']
             extra_param['distribution'] = None
             extra_param['origin'] = self.origin
 

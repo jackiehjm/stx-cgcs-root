@@ -626,7 +626,7 @@ class SrcDownloader(BaseDownloader):
                     logger.warning(' '.join([build_type, 'is not a valid build_type for distro', distro, 'of layer', layer]))
                     continue
 
-                pkg_dirs.extend(discovery.package_dir_list(distro=distro, layer=layer, build_type=build_type))
+                pkg_dirs.extend(discovery.package_dir_list(distro=distro, layer=layer, build_type=build_type, arch=STX_ARCH))
 
         if not len(pkg_dirs):
             logger.info("No source packages found")
