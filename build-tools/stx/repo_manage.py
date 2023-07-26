@@ -31,6 +31,7 @@ import shutil
 from threading import Lock
 import urllib.request
 import utils
+import platform
 
 REPOMGR_URL = os.environ.get('REPOMGR_URL')
 REPOMGR_ORIGIN = os.environ.get('REPOMGR_ORIGIN')
@@ -38,6 +39,10 @@ REPOMGR_DEPLOY_URL = os.environ.get('REPOMGR_DEPLOY_URL')
 
 APTFETCH_JOBS = 20
 
+STX_ARCH = 'amd64'
+host_arch = platform.machine()
+if host_arch == 'aarch64':
+    STX_ARCH = "arm64"
 
 class AptFetch():
     '''
@@ -497,7 +502,7 @@ class RepoMgr():
     # kwargs:url: URL of the upstream repo (http://deb.debian.org/debian)
     # kwargs:distribution: the distribution of the repo (bullseye)
     # kwargs:component: component of the repo (main)
-    # kwargs:architecture: architecture of the repo, "all" is always enabled. (amd64)
+    # kwargs:architecture: architecture of the repo, "all" is always enabled. (amd64 or arm64)
     # kwargs:with_sources: include source packages, default is False.
     # Output: None
     def mirror(self, repo_name, **kwargs):
@@ -922,7 +927,7 @@ def subcmd_mirror(subparsers):
     mirror_parser.add_argument('--component', '-c', help='component name', required=False,
                                default='nginx')
     mirror_parser.add_argument('--architectures', '-a', help='architectures', required=False,
-                               default='amd64')
+                               default=STX_ARCH)
     mirror_parser.add_argument('--with-sources', '-s', help='include source packages',
                                action='store_true')
     mirror_parser.set_defaults(handle=_handleMirror)
