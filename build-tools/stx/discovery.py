@@ -17,6 +17,7 @@ import os
 import re
 import glob
 import yaml
+import platform
 
 from git_utils import git_list
 from repo_utils import repo_root
@@ -30,6 +31,11 @@ STX_DEFAULT_DISTRO_LIST = [ "debian", "centos" ]
 STX_DEFAULT_BUILD_TYPE = "std"
 STX_DEFAULT_BUILD_TYPE_LIST = [STX_DEFAULT_BUILD_TYPE]
 
+STX_ARCH = "amd64"
+STX_SUPPORTED_ARCH = ["amd64", "arm64"]
+host_arch = platform.machine()
+if host_arch == 'aarch64':
+    STX_ARCH = "arm64"
 
 def get_all_distros():
     distro_lst = STX_DEFAULT_DISTRO_LIST
@@ -126,6 +132,14 @@ def get_layer_build_types (layer, distro="debian", skip_non_buildable=True):
     for proj_dir in project_dir_list_all:
         for pkg_dir_file in glob.glob("%s/%s%s" % (proj_dir, distro, "_pkg_dirs_*")):
             bt = os.path.basename(pkg_dir_file).split("_pkg_dirs_")[1]
+            # cleanup arch specific suffix
+            if bt in STX_SUPPORTED_ARCH:
+                continue
+            else:
+                for arch in STX_SUPPORTED_ARCH:
+                    arch_suffix = "_" + arch
+                    if bt.endswith(arch_suffix):
+                        bt = bt.replace(arch_suffix, "")
             if not bt in bt_lst:
                 bt_lst.append(bt)
     return sort_build_type_list(bt_lst, layer)
@@ -137,6 +151,14 @@ def get_all_build_types (distro="debian", skip_non_buildable=True):
     for proj_dir in project_dir_list_all:
         for pkg_dir_file in glob.glob("%s/%s%s" % (proj_dir, distro, "_pkg_dirs_*")):
             bt = os.path.basename(pkg_dir_file).split("_pkg_dirs_")[1]
+            # cleanup arch specific suffix
+            if bt in STX_SUPPORTED_ARCH:
+                continue
+            else:
+                for arch in STX_SUPPORTED_ARCH:
+                    arch_suffix = "_" + arch
+                    if bt.endswith(arch_suffix):
+                        bt = bt.replace(arch_suffix, "")
             if not bt in bt_lst:
                 bt_lst.append(bt)
     return sorted(bt_lst)
@@ -186,32 +208,40 @@ def package_dir_list_handler(entry, proj_dir):
     return [ path ]
 
 
-def package_iso_list (distro="debian", layer="all", build_type="std", skip_non_buildable=True):
+def package_iso_list (distro="debian", layer="all", build_type="std", arch=STX_ARCH, skip_non_buildable=True):
     pkg_iso_list = []
     if layer is None:
         layer = "all"
     for proj_dir in project_dir_list(distro=distro, layer=layer, skip_non_buildable=skip_non_buildable):
-        iso_file = os.path.join(proj_dir, "%s%s%s%s" % (distro, "_iso_image_", build_type, ".inc"))
+        iso_file = os.path.join(proj_dir, "%s_%s_%s_%s%s" % (distro, "iso_image", build_type, arch, ".inc"))
+        if not os.path.isfile(iso_file):
+            iso_file = os.path.join(proj_dir, "%s_%s_%s%s" % (distro, "iso_image", build_type, ".inc"))
         if not os.path.isfile(iso_file):
             if build_type == "std":
                 # It's permitted to omit the "_std" suffix from the file name
-                iso_file = os.path.join(proj_dir, "%s%s" % (distro, "_iso_image.inc"))
+                iso_file = os.path.join(proj_dir, "%s_%s_%s%s" % (distro, "iso_image", arch, ".inc"))
+                if not os.path.isfile(iso_file):
+                    iso_file = os.path.join(proj_dir, "%s_%s" % (distro, "iso_image.inc"))
         if not os.path.isfile(iso_file):
             continue
         pkg_iso_list.extend(bc_safe_fetch(iso_file))
     return pkg_iso_list
 
 
-def package_dir_list (distro="debian", layer="all", build_type="std", skip_non_buildable=True):
+def package_dir_list (distro="debian", layer="all", build_type="std", arch=STX_ARCH, skip_non_buildable=True):
     pkg_dir_list = []
     if layer is None:
         layer = "all"
     for proj_dir in project_dir_list(distro=distro, layer=layer, skip_non_buildable=skip_non_buildable):
-        pkg_file = os.path.join(proj_dir, "%s%s%s" % (distro, "_pkg_dirs_", build_type))
+        pkg_file = os.path.join(proj_dir, "%s_%s_%s_%s" % (distro, "pkg_dirs", build_type, arch))
+        if not os.path.isfile(pkg_file):
+            pkg_file = os.path.join(proj_dir, "%s_%s_%s" % (distro, "pkg_dirs", build_type))
         if not os.path.isfile(pkg_file):
             if build_type == "std":
                 # It's permitted to omit the "_std" suffix from the file name
-                pkg_file = os.path.join(proj_dir, "%s%s" % (distro, "_pkg_dirs"))
+                pkg_file = os.path.join(proj_dir, "%s_%s_%s" % (distro, "pkg_dirs", arch))
+                if not os.path.isfile(pkg_file):
+                    pkg_file = os.path.join(proj_dir, "%s_%s" % (distro, "pkg_dirs"))
         if not os.path.isfile(pkg_file):
             continue
         pkg_dir_list.extend(bc_safe_fetch(pkg_file, package_dir_list_handler, proj_dir))
